@@ -1,0 +1,55 @@
+{
+  "hosting": [
+    {
+      "target": "web",
+      "public": "build/web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
+      "target": "admin",
+      "public": "build/web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    }
+  ],
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "vian-5fc12",
+          "appId": "1:894806698727:android:3ec0dddcb31933c9cc1042",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "vian-5fc12",
+          "configurations": {
+            "android": "1:894806698727:android:3ec0dddcb31933c9cc1042",
+            "ios": "1:894806698727:ios:3c243d69d957b9a9cc1042",
+            "web": "1:894806698727:web:282165aff6310303cc1042"
+          }
+        }
+      }
+    }
+  }
+}

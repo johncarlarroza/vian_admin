@@ -1,0 +1,17 @@
+{
+  "projects": {
+    "default": "vian-5fc12"
+  },
+  "targets": {
+    "vian-5fc12": {
+      "hosting": {
+        "web": [
+          "vian-5fc12"
+        ],
+        "admin": [
+          "vian-admin"
+        ]
+      }
+    }
+  }
+}
