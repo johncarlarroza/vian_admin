@@ -133,7 +133,7 @@ class _LoginPageState extends State<LoginPage> {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                 child: Container(
-                  width: 380,
+                  width: 550,
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.08),
@@ -147,8 +147,8 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       // ===== LOGO =====
                       Container(
-                        width: 140,
-                        height: 140,
+                        width: 470,
+                        height: 290,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.1),

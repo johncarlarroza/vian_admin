@@ -30,3 +30,14 @@ flutter:
 
   assets:
     - assets/
+    - assets/Cafe Bites/
+    - assets/Coffee/
+    - assets/Frappe/
+    - assets/Non Coffee/
+    - assets/Pasta/
+    - assets/Pizza/
+    - assets/Desserts/
+    - assets/Rice bowls/
+    - assets/Side Bites/
+    - assets/Special Coffee/
+    - assets/Vian Freshers/
