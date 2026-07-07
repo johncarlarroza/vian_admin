@@ -179,8 +179,8 @@ class _ProductsPageState extends State<ProductsPage> {
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final name = (data['name'] ?? '').toString().toLowerCase();
-          final category = (data['category'] ?? '').toString();
-
+final category =
+    (data['categoryId'] ?? data['category'] ?? '').toString();
           final matchesSearch = search.isEmpty || name.contains(search);
           final matchesCategory =
               selectedCategory == 'All' || category == selectedCategory;

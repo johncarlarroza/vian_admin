@@ -141,7 +141,7 @@ class AdminProductImage extends StatelessWidget {
         height: size,
         color: AdminUi.softGreen,
         child: hasImage
-            ? Image.asset(
+            ? Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => _fallback(),
@@ -158,7 +158,7 @@ class AdminProductImage extends StatelessWidget {
         'assets/logo.png',
         fit: BoxFit.contain,
         errorBuilder: (_, __, ___) => const Icon(
-          Icons.storefront_rounded,
+          Icons.fastfood_rounded,
           color: AdminUi.primaryGreen,
           size: 28,
         ),

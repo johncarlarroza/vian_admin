@@ -9,6 +9,13 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+enum ReportFilter {
+  daily,
+  weekly,
+  monthly,
+  yearly,
+}
+
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
 
@@ -29,7 +36,48 @@ class _ReportsPageState extends State<ReportsPage> {
   final GlobalKey _salesChartKey = GlobalKey();
   final GlobalKey _paymentsChartKey = GlobalKey();
 
+  ReportFilter _selectedFilter = ReportFilter.daily;
   bool _exporting = false;
+
+  String get _filterLabel {
+    switch (_selectedFilter) {
+      case ReportFilter.daily:
+        return 'Daily';
+      case ReportFilter.weekly:
+        return 'Weekly';
+      case ReportFilter.monthly:
+        return 'Monthly';
+      case ReportFilter.yearly:
+        return 'Yearly';
+    }
+  }
+
+  DateTimeRange _selectedRange() {
+    final now = DateTime.now();
+
+    switch (_selectedFilter) {
+      case ReportFilter.daily:
+        final start = DateTime(now.year, now.month, now.day);
+        final end = start.add(const Duration(days: 1));
+        return DateTimeRange(start: start, end: end);
+
+      case ReportFilter.weekly:
+        final today = DateTime(now.year, now.month, now.day);
+        final start = today.subtract(Duration(days: now.weekday - 1));
+        final end = start.add(const Duration(days: 7));
+        return DateTimeRange(start: start, end: end);
+
+      case ReportFilter.monthly:
+        final start = DateTime(now.year, now.month, 1);
+        final end = DateTime(now.year, now.month + 1, 1);
+        return DateTimeRange(start: start, end: end);
+
+      case ReportFilter.yearly:
+        final start = DateTime(now.year, 1, 1);
+        final end = DateTime(now.year + 1, 1, 1);
+        return DateTimeRange(start: start, end: end);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +119,7 @@ class _ReportsPageState extends State<ReportsPage> {
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final wide = constraints.maxWidth > 1100;
+
                           if (wide) {
                             return Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,6 +162,7 @@ class _ReportsPageState extends State<ReportsPage> {
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final wide = constraints.maxWidth > 1100;
+
                           if (wide) {
                             return Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,6 +184,8 @@ class _ReportsPageState extends State<ReportsPage> {
                         },
                       ),
                       const SizedBox(height: 18),
+                      _buildRecentTransactions(data),
+                      const SizedBox(height: 18),
                       _buildRecentSummary(data),
                     ],
                   ),
@@ -148,9 +200,18 @@ class _ReportsPageState extends State<ReportsPage> {
 
   Future<_ReportsData> _loadReportsData() async {
     final firestore = FirebaseFirestore.instance;
+    final range = _selectedRange();
 
     final txSnap = await firestore
         .collection('transactions')
+        .where(
+          'createdAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(range.start),
+        )
+        .where(
+          'createdAt',
+          isLessThan: Timestamp.fromDate(range.end),
+        )
         .orderBy('createdAt', descending: true)
         .get();
 
@@ -159,6 +220,9 @@ class _ReportsPageState extends State<ReportsPage> {
     return _ReportsData.fromSnapshots(
       transactions: txSnap.docs,
       users: userSnap.docs,
+      filterLabel: _filterLabel,
+      startDate: range.start,
+      endDate: range.end,
     );
   }
 
@@ -167,11 +231,11 @@ class _ReportsPageState extends State<ReportsPage> {
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Reports & Analytics',
                   style: TextStyle(
                     fontSize: 26,
@@ -179,10 +243,10 @@ class _ReportsPageState extends State<ReportsPage> {
                     color: darkText,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
-                  'Overall business insights, charts, revenue, user activity, and downloadable PDF reports.',
-                  style: TextStyle(
+                  '${data.filterLabel} transaction report • ${_formatRange(data.startDate, data.endDate)}',
+                  style: const TextStyle(
                     fontSize: 13,
                     color: softText,
                     fontWeight: FontWeight.w600,
@@ -191,6 +255,44 @@ class _ReportsPageState extends State<ReportsPage> {
               ],
             ),
           ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: borderColor),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<ReportFilter>(
+                value: _selectedFilter,
+                items: const [
+                  DropdownMenuItem(
+                    value: ReportFilter.daily,
+                    child: Text('Daily'),
+                  ),
+                  DropdownMenuItem(
+                    value: ReportFilter.weekly,
+                    child: Text('Weekly'),
+                  ),
+                  DropdownMenuItem(
+                    value: ReportFilter.monthly,
+                    child: Text('Monthly'),
+                  ),
+                  DropdownMenuItem(
+                    value: ReportFilter.yearly,
+                    child: Text('Yearly'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    _selectedFilter = value;
+                  });
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
           FilledButton.icon(
             onPressed: _exporting ? null : () => _exportPdf(data),
             style: FilledButton.styleFrom(
@@ -205,7 +307,9 @@ class _ReportsPageState extends State<ReportsPage> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.picture_as_pdf_rounded),
-            label: Text(_exporting ? 'Exporting...' : 'Export PDF'),
+            label: Text(
+              _exporting ? 'Exporting...' : 'Export ${data.filterLabel} PDF',
+            ),
           ),
         ],
       ),
@@ -235,7 +339,7 @@ class _ReportsPageState extends State<ReportsPage> {
               blue,
             ),
             _statCard(
-              'Transactions',
+              '${data.filterLabel} Transactions',
               '${data.totalTransactions}',
               Icons.receipt_long_rounded,
               primaryGreen,
@@ -345,18 +449,18 @@ class _ReportsPageState extends State<ReportsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Daily Sales Trend',
-            style: TextStyle(
+          Text(
+            '${data.filterLabel} Sales Trend',
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: darkText,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Revenue for the last 7 recorded days.',
-            style: TextStyle(
+          Text(
+            'Revenue within ${data.filterLabel.toLowerCase()} selected range.',
+            style: const TextStyle(
               color: softText,
               fontWeight: FontWeight.w600,
             ),
@@ -364,79 +468,89 @@ class _ReportsPageState extends State<ReportsPage> {
           const SizedBox(height: 18),
           SizedBox(
             height: 280,
-            child: LineChart(
-              LineChartData(
-                minY: 0,
-                maxY: maxY,
-                gridData: FlGridData(
-                  show: true,
-                  horizontalInterval: maxY / 5,
-                ),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 48,
-                      getTitlesWidget: (value, meta) {
-                        return Text(
-                          '₱${value.toInt()}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: softText,
-                            fontWeight: FontWeight.w700,
+            child: labels.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No sales data for this period.',
+                      style: TextStyle(
+                        color: softText,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                : LineChart(
+                    LineChartData(
+                      minY: 0,
+                      maxY: maxY,
+                      gridData: FlGridData(
+                        show: true,
+                        horizontalInterval: maxY / 5,
+                      ),
+                      borderData: FlBorderData(show: false),
+                      titlesData: FlTitlesData(
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 48,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                '₱${value.toInt()}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: softText,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index < 0 || index >= labels.length) {
-                          return const SizedBox.shrink();
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            labels[index],
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: softText,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              final index = value.toInt();
+                              if (index < 0 || index >= labels.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  labels[index],
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: softText,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          isCurved: true,
+                          barWidth: 4,
+                          dotData: const FlDotData(show: true),
+                          spots: List.generate(
+                            values.length,
+                            (index) => FlSpot(index.toDouble(), values[index]),
+                          ),
+                          color: primaryGreen,
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: primaryGreen.withOpacity(0.12),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                lineBarsData: [
-                  LineChartBarData(
-                    isCurved: true,
-                    barWidth: 4,
-                    dotData: const FlDotData(show: true),
-                    spots: List.generate(
-                      values.length,
-                      (index) => FlSpot(index.toDouble(), values[index]),
-                    ),
-                    color: primaryGreen,
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: primaryGreen.withOpacity(0.12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
         ],
       ),
@@ -449,7 +563,9 @@ class _ReportsPageState extends State<ReportsPage> {
       _BarPoint('GCash', data.gcashRevenue, blue),
     ];
 
-    final maxY = items.map((e) => e.value).fold<double>(0, (a, b) => a > b ? a : b) + 20;
+    final maxY =
+        items.map((e) => e.value).fold<double>(0, (a, b) => a > b ? a : b) +
+            20;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -477,9 +593,9 @@ class _ReportsPageState extends State<ReportsPage> {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Revenue split by payment channel.',
-            style: TextStyle(
+          Text(
+            '${data.filterLabel} revenue split by payment channel.',
+            style: const TextStyle(
               color: softText,
               fontWeight: FontWeight.w600,
             ),
@@ -589,9 +705,9 @@ class _ReportsPageState extends State<ReportsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Order Status Breakdown',
-            style: TextStyle(
+          Text(
+            '${data.filterLabel} Order Status',
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: darkText,
@@ -599,7 +715,7 @@ class _ReportsPageState extends State<ReportsPage> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Current order distribution based on saved statuses.',
+            'Order distribution based on saved statuses.',
             style: TextStyle(
               color: softText,
               fontWeight: FontWeight.w600,
@@ -670,9 +786,9 @@ class _ReportsPageState extends State<ReportsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Top Selling Products',
-            style: TextStyle(
+          Text(
+            '${data.filterLabel} Top Products',
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
               color: darkText,
@@ -747,6 +863,93 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
+  Widget _buildRecentTransactions(_ReportsData data) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x10000000),
+            blurRadius: 14,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${data.filterLabel} Transactions',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: darkText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Transactions included in the selected report period.',
+            style: TextStyle(
+              color: softText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (data.recentTransactions.isEmpty)
+            const Text(
+              'No transactions found for this period.',
+              style: TextStyle(
+                color: softText,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          else
+            ...data.recentTransactions.take(10).map((tx) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAF9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.receipt_long_rounded,
+                      color: primaryGreen,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '${tx.orderNumber} • ${tx.customerName}',
+                        style: const TextStyle(
+                          color: darkText,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '₱${tx.total.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: primaryGreen,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRecentSummary(_ReportsData data) {
     return Container(
       width: double.infinity,
@@ -776,7 +979,7 @@ class _ReportsPageState extends State<ReportsPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'This report currently shows ${data.totalUsers} registered users, ${data.totalTransactions} transactions, ₱${data.totalRevenue.toStringAsFixed(2)} total paid revenue, and ${data.completedOrders} completed orders. Cash revenue is ₱${data.cashRevenue.toStringAsFixed(2)}, while GCash revenue is ₱${data.gcashRevenue.toStringAsFixed(2)}.',
+            'This ${data.filterLabel.toLowerCase()} report from ${_formatRange(data.startDate, data.endDate)} shows ${data.totalTransactions} transactions, ${data.paidPayments} paid payments, ₱${data.totalRevenue.toStringAsFixed(2)} total revenue, and ${data.completedOrders} completed orders. Cash revenue is ₱${data.cashRevenue.toStringAsFixed(2)}, while GCash revenue is ₱${data.gcashRevenue.toStringAsFixed(2)}.',
             style: const TextStyle(
               color: softText,
               height: 1.5,
@@ -803,15 +1006,15 @@ class _ReportsPageState extends State<ReportsPage> {
           margin: const pw.EdgeInsets.all(28),
           build: (context) => [
             pw.Text(
-              'VIAN CAFÉ - REPORTS & ANALYTICS',
+              'VIAN CAFÉ - ${data.filterLabel.toUpperCase()} TRANSACTION REPORT',
               style: pw.TextStyle(
-                fontSize: 22,
+                fontSize: 21,
                 fontWeight: pw.FontWeight.bold,
               ),
             ),
             pw.SizedBox(height: 6),
             pw.Text(
-              'Generated report summary',
+              'Date range: ${_formatRange(data.startDate, data.endDate)}',
               style: const pw.TextStyle(fontSize: 11),
             ),
             pw.SizedBox(height: 18),
@@ -826,12 +1029,24 @@ class _ReportsPageState extends State<ReportsPage> {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   _pdfRow('Total Users', '${data.totalUsers}'),
-                  _pdfRow('Total Transactions', '${data.totalTransactions}'),
+                  _pdfRow('Filtered Transactions', '${data.totalTransactions}'),
                   _pdfRow('Paid Payments', '${data.paidPayments}'),
-                  _pdfRow('Total Revenue', '₱${data.totalRevenue.toStringAsFixed(2)}'),
-                  _pdfRow('Cash Revenue', '₱${data.cashRevenue.toStringAsFixed(2)}'),
-                  _pdfRow('GCash Revenue', '₱${data.gcashRevenue.toStringAsFixed(2)}'),
-                  _pdfRow('Average Sale', '₱${data.averageSale.toStringAsFixed(2)}'),
+                  _pdfRow(
+                    'Total Revenue',
+                    'PHP ${data.totalRevenue.toStringAsFixed(2)}',
+                  ),
+                  _pdfRow(
+                    'Cash Revenue',
+                    'PHP ${data.cashRevenue.toStringAsFixed(2)}',
+                  ),
+                  _pdfRow(
+                    'GCash Revenue',
+                    'PHP ${data.gcashRevenue.toStringAsFixed(2)}',
+                  ),
+                  _pdfRow(
+                    'Average Sale',
+                    'PHP ${data.averageSale.toStringAsFixed(2)}',
+                  ),
                 ],
               ),
             ),
@@ -851,14 +1066,14 @@ class _ReportsPageState extends State<ReportsPage> {
             pw.SizedBox(height: 18),
             if (salesChartBytes != null) ...[
               pw.Text(
-                'Daily Sales Trend',
+                'Sales Trend',
                 style: pw.TextStyle(
                   fontSize: 15,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
               pw.SizedBox(height: 8),
-              pw.Image(pw.MemoryImage(salesChartBytes), height: 220),
+              pw.Image(pw.MemoryImage(salesChartBytes), height: 200),
               pw.SizedBox(height: 16),
             ],
             if (paymentChartBytes != null) ...[
@@ -870,7 +1085,7 @@ class _ReportsPageState extends State<ReportsPage> {
                 ),
               ),
               pw.SizedBox(height: 8),
-              pw.Image(pw.MemoryImage(paymentChartBytes), height: 220),
+              pw.Image(pw.MemoryImage(paymentChartBytes), height: 200),
               pw.SizedBox(height: 16),
             ],
             pw.Text(
@@ -882,17 +1097,58 @@ class _ReportsPageState extends State<ReportsPage> {
             ),
             pw.SizedBox(height: 8),
             if (data.topProducts.isEmpty)
-              pw.Text('No product sales data yet.')
+              pw.Text('No product sales data for this period.')
             else
               ...data.topProducts.take(8).map(
-                    (item) => pw.Bullet(text: '${item.name} - ${item.qty} sold'),
+                    (item) => pw.Bullet(
+                      text: '${item.name} - ${item.qty} sold',
+                    ),
                   ),
+            pw.SizedBox(height: 18),
+            pw.Text(
+              'Transactions',
+              style: pw.TextStyle(
+                fontSize: 15,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 8),
+            if (data.recentTransactions.isEmpty)
+              pw.Text('No transactions found for this period.')
+            else
+              pw.Table.fromTextArray(
+                headers: const [
+                  'Order No.',
+                  'Customer',
+                  'Payment',
+                  'Status',
+                  'Total',
+                ],
+                data: data.recentTransactions.map((tx) {
+                  return [
+                    tx.orderNumber,
+                    tx.customerName,
+                    tx.paymentMethod.toUpperCase(),
+                    tx.status,
+                    'PHP ${tx.total.toStringAsFixed(2)}',
+                  ];
+                }).toList(),
+                headerStyle: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: 9,
+                ),
+                cellStyle: const pw.TextStyle(fontSize: 8),
+                cellAlignment: pw.Alignment.centerLeft,
+                headerDecoration: const pw.BoxDecoration(
+                  color: PdfColors.grey300,
+                ),
+              ),
           ],
         ),
       );
 
       await Printing.layoutPdf(
-        name: 'vian_reports.pdf',
+        name: 'vian_${data.filterLabel.toLowerCase()}_transactions.pdf',
         onLayout: (format) async => pdf.save(),
       );
     } finally {
@@ -932,9 +1188,25 @@ class _ReportsPageState extends State<ReportsPage> {
       return null;
     }
   }
+
+  String _formatRange(DateTime start, DateTime end) {
+    String f(DateTime d) {
+      final y = d.year.toString();
+      final m = d.month.toString().padLeft(2, '0');
+      final day = d.day.toString().padLeft(2, '0');
+      return '$y-$m-$day';
+    }
+
+    final displayEnd = end.subtract(const Duration(days: 1));
+    return '${f(start)} to ${f(displayEnd)}';
+  }
 }
 
 class _ReportsData {
+  final String filterLabel;
+  final DateTime startDate;
+  final DateTime endDate;
+
   final int totalUsers;
   final int totalTransactions;
   final int paidPayments;
@@ -942,14 +1214,20 @@ class _ReportsData {
   final int preparingOrders;
   final int completedOrders;
   final int cancelledOrders;
+
   final double totalRevenue;
   final double cashRevenue;
   final double gcashRevenue;
   final double averageSale;
+
   final Map<String, double> dailySales;
   final List<_TopProductItem> topProducts;
+  final List<_ReportTransaction> recentTransactions;
 
   const _ReportsData({
+    required this.filterLabel,
+    required this.startDate,
+    required this.endDate,
     required this.totalUsers,
     required this.totalTransactions,
     required this.paidPayments,
@@ -963,11 +1241,15 @@ class _ReportsData {
     required this.averageSale,
     required this.dailySales,
     required this.topProducts,
+    required this.recentTransactions,
   });
 
   factory _ReportsData.fromSnapshots({
     required List<QueryDocumentSnapshot> transactions,
     required List<QueryDocumentSnapshot> users,
+    required String filterLabel,
+    required DateTime startDate,
+    required DateTime endDate,
   }) {
     int paidPayments = 0;
     int pendingOrders = 0;
@@ -979,16 +1261,19 @@ class _ReportsData {
     double cashRevenue = 0;
     double gcashRevenue = 0;
 
-    final Map<String, double> dayMap = {};
+    final Map<String, double> salesMap = {};
     final Map<String, int> productQty = {};
+    final List<_ReportTransaction> reportTransactions = [];
 
     for (final doc in transactions) {
       final data = doc.data() as Map<String, dynamic>;
 
       final total = _toDouble(data['total']);
       final status = (data['status'] ?? '').toString().toLowerCase();
-      final paymentMethod = (data['paymentMethod'] ?? '').toString().toLowerCase();
-      final paymentStatus = (data['paymentStatus'] ?? '').toString().toLowerCase();
+      final paymentMethod =
+          (data['paymentMethod'] ?? '').toString().toLowerCase();
+      final paymentStatus =
+          (data['paymentStatus'] ?? '').toString().toLowerCase();
 
       if (status == 'pending') pendingOrders++;
       if (status == 'preparing') preparingOrders++;
@@ -1007,10 +1292,12 @@ class _ReportsData {
       }
 
       final createdAt = data['createdAt'];
+      DateTime? createdDate;
+
       if (createdAt is Timestamp) {
-        final dt = createdAt.toDate();
-        final key = _shortDate(dt);
-        dayMap[key] = (dayMap[key] ?? 0) + total;
+        createdDate = createdAt.toDate();
+        final key = _chartLabel(createdDate, filterLabel);
+        salesMap[key] = (salesMap[key] ?? 0) + total;
       }
 
       final items = data['items'];
@@ -1023,17 +1310,25 @@ class _ReportsData {
           }
         }
       }
+
+      reportTransactions.add(
+        _ReportTransaction(
+          orderNumber: (data['orderNumber'] ?? doc.id).toString(),
+          customerName:
+              (data['customerName'] ?? 'Walk-in Customer').toString(),
+          paymentMethod: paymentMethod,
+          status: status,
+          total: total,
+          createdAt: createdDate,
+        ),
+      );
     }
 
-    final sortedDays = dayMap.entries.toList()
+    final sortedSales = salesMap.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
-    final last7 = sortedDays.length > 7
-        ? sortedDays.sublist(sortedDays.length - 7)
-        : sortedDays;
-
     final dailySales = {
-      for (final entry in last7) entry.key: entry.value,
+      for (final entry in sortedSales) entry.key: entry.value,
     };
 
     final topProducts = productQty.entries
@@ -1043,7 +1338,16 @@ class _ReportsData {
 
     final avg = paidPayments == 0 ? 0.0 : totalRevenue / paidPayments;
 
+    reportTransactions.sort((a, b) {
+      final ad = a.createdAt ?? DateTime(1900);
+      final bd = b.createdAt ?? DateTime(1900);
+      return bd.compareTo(ad);
+    });
+
     return _ReportsData(
+      filterLabel: filterLabel,
+      startDate: startDate,
+      endDate: endDate,
       totalUsers: users.length,
       totalTransactions: transactions.length,
       paidPayments: paidPayments,
@@ -1057,24 +1361,58 @@ class _ReportsData {
       averageSale: avg,
       dailySales: dailySales,
       topProducts: topProducts.take(10).toList(),
+      recentTransactions: reportTransactions,
     );
+  }
+
+  static String _chartLabel(DateTime dt, String filterLabel) {
+    switch (filterLabel) {
+      case 'Daily':
+        final h = dt.hour.toString().padLeft(2, '0');
+        return '$h:00';
+
+      case 'Weekly':
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        return days[dt.weekday - 1];
+
+      case 'Monthly':
+        return dt.day.toString().padLeft(2, '0');
+
+      case 'Yearly':
+        const months = [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ];
+        return months[dt.month - 1];
+
+      default:
+        final mm = dt.month.toString().padLeft(2, '0');
+        final dd = dt.day.toString().padLeft(2, '0');
+        return '$mm/$dd';
+    }
   }
 
   static double _toDouble(dynamic value) {
     if (value is int) return value.toDouble();
     if (value is double) return value;
+    if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   static int _toInt(dynamic value) {
     if (value is int) return value;
+    if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
-  }
-
-  static String _shortDate(DateTime dt) {
-    final mm = dt.month.toString().padLeft(2, '0');
-    final dd = dt.day.toString().padLeft(2, '0');
-    return '$mm/$dd';
   }
 }
 
@@ -1085,6 +1423,24 @@ class _TopProductItem {
   const _TopProductItem({
     required this.name,
     required this.qty,
+  });
+}
+
+class _ReportTransaction {
+  final String orderNumber;
+  final String customerName;
+  final String paymentMethod;
+  final String status;
+  final double total;
+  final DateTime? createdAt;
+
+  const _ReportTransaction({
+    required this.orderNumber,
+    required this.customerName,
+    required this.paymentMethod,
+    required this.status,
+    required this.total,
+    required this.createdAt,
   });
 }
 

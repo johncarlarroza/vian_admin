@@ -683,7 +683,7 @@ class MenuSeedData {
       case "Vian's Special Coffee":
       case 'Non-Coffee':
       case 'Frappe':
-        return 'drink';
+         return 'drink';
       default:
         return 'food';
     }
@@ -803,7 +803,7 @@ class MenuSeedData {
       // SPECIAL COFFEE
       // =========================
       'Biscoff Latte': 'assets/Special Coffee/Biscoff Latte.jpg',
-      'Sea Salt Latte': 'assets/Special Coffee/Sea Salt Latte.jpg',
+      'Sea Salt Latte': 'assets/Speci2al Coffee/Sea Salt Latte.jpg',
       'Strawberry Latte': 'assets/Special Coffee/Strawberry Latte.jpg',
       'Tiramisu Latte': 'assets/Special Coffee/Tiramisu Latte.jpg',
 

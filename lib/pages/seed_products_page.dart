@@ -13,6 +13,21 @@ class _SeedProductsPageState extends State<SeedProductsPage> {
   bool _loading = false;
   String _message = '';
 
+  final List<String> categories = const [
+    'Rice Bowl',
+    'Café Bites',
+    'Pasta',
+    'Desserts',
+    'Side Bites',
+    'Coffee',
+    "Vian's Special Coffee",
+    'Non-Coffee',
+    'Frappe',
+    'Vian Freshers',
+    'Guimaras Pizza by G7',
+    'Vian Chicken Wings',
+  ];
+
   Future<void> _uploadProducts() async {
     setState(() {
       _loading = true;
@@ -24,18 +39,25 @@ class _SeedProductsPageState extends State<SeedProductsPage> {
       final batch = firestore.batch();
 
       for (final product in MenuSeedData.products) {
-        final productName = (product['name'] ?? '').toString();
-        final docId = _slugify(productName);
+        final name = (product['name'] ?? '').toString();
+        final docId = _slugify(name);
         final docRef = firestore.collection('products').doc(docId);
 
-        batch.set(docRef, product, SetOptions(merge: true));
+        final fixedProduct = Map<String, dynamic>.from(product);
+        fixedProduct['id'] = docId;
+        fixedProduct['categoryId'] =
+            fixedProduct['categoryId'] ?? fixedProduct['category'] ?? '';
+        fixedProduct['category'] =
+            fixedProduct['category'] ?? fixedProduct['categoryId'] ?? '';
+
+        batch.set(docRef, fixedProduct, SetOptions(merge: true));
       }
 
       await batch.commit();
 
       setState(() {
         _message =
-            'Success! ${MenuSeedData.products.length} products uploaded to Firestore.';
+            'Success! ${MenuSeedData.products.length} products uploaded.';
       });
     } catch (e) {
       setState(() {
@@ -55,28 +77,19 @@ class _SeedProductsPageState extends State<SeedProductsPage> {
     });
 
     try {
-      final categories = [
-        'Rice Bowl',
-        'Café Bites',
-        'Pasta',
-        'Desserts',
-        'Side Bites',
-        'Coffee',
-        "Vian's Special Coffee",
-        'Non-Coffee',
-        'Frappe',
-      ];
-
       final firestore = FirebaseFirestore.instance;
       final batch = firestore.batch();
 
       for (int i = 0; i < categories.length; i++) {
         final category = categories[i];
         final docRef = firestore.collection('categories').doc(category);
+
         batch.set(
           docRef,
           {
+            'id': category,
             'name': category,
+            'iconName': _iconForCategory(category),
             'sortOrder': i + 1,
             'isActive': true,
             'createdAt': FieldValue.serverTimestamp(),
@@ -112,6 +125,7 @@ class _SeedProductsPageState extends State<SeedProductsPage> {
           await FirebaseFirestore.instance.collection('products').get();
 
       final batch = FirebaseFirestore.instance.batch();
+
       for (final doc in snapshot.docs) {
         batch.delete(doc.reference);
       }
@@ -132,6 +146,38 @@ class _SeedProductsPageState extends State<SeedProductsPage> {
     }
   }
 
+  Future<void> _clearCategories() async {
+    setState(() {
+      _loading = true;
+      _message = '';
+    });
+
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('categories').get();
+
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+
+      await batch.commit();
+
+      setState(() {
+        _message = 'All categories deleted.';
+      });
+    } catch (e) {
+      setState(() {
+        _message = 'Delete categories failed: $e';
+      });
+    } finally {
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
   String _slugify(String value) {
     return value
         .toLowerCase()
@@ -143,9 +189,41 @@ class _SeedProductsPageState extends State<SeedProductsPage> {
         .replaceAll(RegExp(r'^_|_$'), '');
   }
 
+  String _iconForCategory(String category) {
+    switch (category) {
+      case 'Rice Bowl':
+        return 'rice_bowl';
+      case 'Café Bites':
+        return 'restaurant';
+      case 'Pasta':
+        return 'dinner_dining';
+      case 'Desserts':
+        return 'cake';
+      case 'Side Bites':
+        return 'fastfood';
+      case 'Coffee':
+        return 'local_cafe';
+      case "Vian's Special Coffee":
+        return 'coffee';
+      case 'Non-Coffee':
+        return 'emoji_food_beverage';
+      case 'Frappe':
+        return 'icecream';
+      case 'Vian Freshers':
+        return 'local_drink';
+      case 'Guimaras Pizza by G7':
+        return 'local_pizza';
+      case 'Vian Chicken Wings':
+        return 'lunch_dining';
+      default:
+        return 'restaurant_menu';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF4F7F6),
       appBar: AppBar(
         title: const Text('Seed Products'),
         centerTitle: true,
@@ -167,7 +245,11 @@ class _SeedProductsPageState extends State<SeedProductsPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Products ready to upload: ${MenuSeedData.products.length}',
+                  'Products ready: ${MenuSeedData.products.length}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                Text(
+                  'Categories ready: ${categories.length}',
                   style: const TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 24),
@@ -185,6 +267,11 @@ class _SeedProductsPageState extends State<SeedProductsPage> {
                   onPressed: _loading ? null : _clearProducts,
                   child: const Text('Delete All Products'),
                 ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: _loading ? null : _clearCategories,
+                  child: const Text('Delete All Categories'),
+                ),
                 const SizedBox(height: 24),
                 if (_loading) const CircularProgressIndicator(),
                 if (_message.isNotEmpty) ...[
@@ -192,9 +279,7 @@ class _SeedProductsPageState extends State<SeedProductsPage> {
                   Text(
                     _message,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ],
               ],

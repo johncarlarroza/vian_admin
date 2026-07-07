@@ -33,22 +33,21 @@ class VianSidebar extends StatelessWidget {
 
           const SizedBox(height: 30),
 
-          /// 🔥 MENU ITEMS
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              children: [
-                _navItem(Icons.dashboard_rounded, 'Dashboard', 0),
-                _navItem(Icons.receipt_long_rounded, 'Transactions', 1),
-                _navItem(Icons.shopping_cart_rounded, 'Orders', 2),
-                _navItem(Icons.inventory_2_rounded, 'Products', 3),
-                _navItem(Icons.payments_rounded, 'Payments', 4),
-                _navItem(Icons.bar_chart_rounded, 'Reports', 5),
-                // _navItem(Icons.settings_rounded, 'Settings', 6),
-              ],
-            ),
-          ),
-
+ Expanded(
+  child: ListView(
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    children: [
+      _navItem(Icons.dashboard_rounded, 'Dashboard', 0),
+      _navItem(Icons.receipt_long_rounded, 'Transactions', 1),
+      _navItem(Icons.shopping_cart_rounded, 'Orders', 2),
+      _navItem(Icons.inventory_2_rounded, 'Products', 3),
+      _navItem(Icons.payments_rounded, 'Payments', 4),
+      _navItem(Icons.bar_chart_rounded, 'Reports', 5),
+      _navItem(Icons.confirmation_number_rounded, 'Queue Counter', 6),
+      _navItem(Icons.settings_rounded, 'Settings', 7),
+    ],
+  ),
+),
           /// 🔥 LOGOUT
           Padding(
             padding: const EdgeInsets.all(14),
@@ -100,7 +99,7 @@ class VianSidebar extends StatelessWidget {
           ),
           child: Image.asset(
             'assets/logo.png',
-            fit: BoxFit.contain,
+            fit: BoxFit.fill,
             errorBuilder: (_, __, ___) =>
                 const Icon(Icons.storefront, color: Colors.white, size: 40),
           ),

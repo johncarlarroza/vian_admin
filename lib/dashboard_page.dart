@@ -59,8 +59,8 @@ class DashboardPage extends StatelessWidget {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     int crossAxisCount = 4;
-                    if (constraints.maxWidth < 1300) crossAxisCount = 2;
-                    if (constraints.maxWidth < 720) crossAxisCount = 1;
+                    if (constraints.maxWidth < 1300) crossAxisCount = 4;
+                    if (constraints.maxWidth < 720) crossAxisCount = 2;
 
                     return GridView.count(
                       crossAxisCount: crossAxisCount,
